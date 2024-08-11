@@ -1,24 +1,47 @@
+import os
 import socket
 import ssl
 
 class URL:
     def __init__(self, url: str):
         # split url with scheme (http & example.org)
-        self.scheme, url = url.split("://", 1)
-        assert self.scheme in ["http", "https"]
+        if "http" in url:
+            self.mode = "http"
+            sep = "://"
+        elif "file" in url:
+            self.mode = "file"
+            sep = ":///"
+            
+        self.scheme, url = url.split(sep, 1)
+        assert self.scheme in ["http", "https", "file"]
 
         # separate host and path (example.org and /index)
-        if "/" not in url:
-            url = url + "/"
-        self.host, url = url.split("/", 1)
-        self.path = "/" + url
+        if self.mode == "http":
+            if "/" not in url:
+                url = url + "/"
+            self.host, url = url.split("/", 1)
+            self.path = "/" + url
 
-        # get specified port
-        if ":" in self.host:
-            self.host, port = self.host.split(":", 1)
-            port = int(port)
+            # get specified port
+            if ":" in self.host:
+                self.host, port = self.host.split(":", 1)
+                port = int(port)
 
-    def request(self):
+        elif self.mode == "file":
+            self.path = url
+
+    def request_file(self):
+        file_list = []
+        files = os.listdir(self.path)
+        for file in files:
+            file_list.append(file)
+        
+        return {
+            "content": file_list,
+            "type": "file"
+        }
+
+    def request_http(self):
         # create socket
         s = socket.socket(
             family=socket.AF_INET,
@@ -68,22 +91,42 @@ class URL:
         # read content(body) and return
         content = res.read()
         s.close()
-        return content
+        return {
+            "content": content,
+            "type": "http"
+        }
 
-def show(body):
+    def request(self):
+        if self.mode == "http":
+            return self.request_http()
+        elif self.mode == "file":
+            return self.request_file()
+
+def show(resp):
+    mode = resp["type"]
+    body = resp["content"]
+    
     # parse tag
-    in_tag = False
-    for c in body:
-        if c == "<":
-            in_tag = True
-        elif c == ">":
-            in_tag = False
-        elif not in_tag:
-            print(c, end="")
+    if mode == "http":
+        in_tag = False
+        for c in body:
+            if c == "<":
+                in_tag = True
+            elif c == ">":
+                in_tag = False
+            elif not in_tag:
+                print(c, end="")
+
+    elif mode == "file":
+        for file in body:
+            print(file)
+
+    else:
+        print(mode)
     
 def load(url: URL):
-    body = url.request()
-    show(body)
+    resp = url.request()
+    show(resp)
 
 if __name__ == "__main__":
     import sys
