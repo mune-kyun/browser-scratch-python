@@ -43,6 +43,8 @@ class URL:
         # form request
         req = "GET {} HTTP/1.0\r\n".format(self.path)
         req += "Host: {}\r\n".format(self.host)
+        req += "Connection: {}\r\n".format("close")
+        req += "User-Agent: {}\r\n".format("mozilla")
         req += "\r\n"
         s.send(req.encode("utf-8"))
 
