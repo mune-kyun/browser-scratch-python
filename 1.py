@@ -2,21 +2,28 @@ import os
 import socket
 import ssl
 
+class URLScheme:
+    HTTP = "http"
+    HTTPS = "https"
+    FILE = "file"
+
 class URL:
     def __init__(self, url: str):
         # split url with scheme (http & example.org)
-        if "http" in url:
-            self.mode = "http"
+        if URLScheme.HTTP in url:
+            self.scheme = URLScheme.HTTP
             sep = "://"
-        elif "file" in url:
-            self.mode = "file"
+        elif URLScheme.HTTPS in url:
+            self.scheme = URLScheme.HTTPS
+            sep = "://"
+        elif URLScheme.FILE in url:
+            self.scheme = URLScheme.FILE
             sep = ":///"
             
         self.scheme, url = url.split(sep, 1)
-        assert self.scheme in ["http", "https", "file"]
 
         # separate host and path (example.org and /index)
-        if self.mode == "http":
+        if self.scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
             if "/" not in url:
                 url = url + "/"
             self.host, url = url.split("/", 1)
@@ -27,7 +34,7 @@ class URL:
                 self.host, port = self.host.split(":", 1)
                 port = int(port)
 
-        elif self.mode == "file":
+        elif self.scheme == URLScheme.FILE:
             self.path = url
 
     def request_file(self):
@@ -38,7 +45,7 @@ class URL:
         
         return {
             "content": file_list,
-            "type": "file"
+            "scheme": self.scheme
         }
 
     def request_http(self):
@@ -50,16 +57,16 @@ class URL:
         )
 
         # pick port
-        if self.scheme == "http":
+        if self.scheme == URLScheme.HTTP:
             self.port = 80
-        elif self.scheme == "https":
+        elif self.scheme == URLScheme.HTTPS:
             self.port = 443
 
         # connect
         s.connect((self.host, self.port))
 
         # handle https
-        if self.scheme == "https":
+        if self.scheme == URLScheme.HTTPS:
             ctx = ssl.create_default_context()
             s = ctx.wrap_socket(s, server_hostname=self.host)
 
@@ -93,21 +100,21 @@ class URL:
         s.close()
         return {
             "content": content,
-            "type": "http"
+            "scheme": self.scheme
         }
 
     def request(self):
-        if self.mode == "http":
+        if self.scheme == URLScheme.HTTP or self.scheme == URLScheme.HTTPS:
             return self.request_http()
-        elif self.mode == "file":
+        elif self.scheme == URLScheme.FILE:
             return self.request_file()
 
 def show(resp):
-    mode = resp["type"]
+    scheme = resp["scheme"]
     body = resp["content"]
     
     # parse tag
-    if mode == "http":
+    if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
         in_tag = False
         for c in body:
             if c == "<":
@@ -117,12 +124,12 @@ def show(resp):
             elif not in_tag:
                 print(c, end="")
 
-    elif mode == "file":
+    elif scheme == URLScheme.FILE:
         for file in body:
             print(file)
 
     else:
-        print(mode)
+        print(scheme)
     
 def load(url: URL):
     resp = url.request()
