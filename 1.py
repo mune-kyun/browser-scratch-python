@@ -7,9 +7,15 @@ class URLScheme:
     HTTPS = "https"
     FILE = "file"
     DATA = "data"
+    VIEW_SOURCE = "view-source"
 
 class URL:
     def __init__(self, url: str):
+        # view source mode
+        self.is_view_source = URLScheme.VIEW_SOURCE in url
+        if self.is_view_source is True:
+            _, url = url.split(":", 1)
+
         # split url with scheme (http & example.org)
         if URLScheme.HTTP in url:
             self.scheme = URLScheme.HTTP
@@ -23,7 +29,7 @@ class URL:
         elif URLScheme.DATA in url:
             self.scheme = URLScheme.DATA
             sep = ","
-            
+
         if self.scheme == URLScheme.DATA:
             _, url = url.split(sep, 1)
         else:
@@ -99,7 +105,8 @@ class URL:
         s.close()
         return {
             "content": content,
-            "scheme": self.scheme
+            "scheme": self.scheme,
+            "is_view_source": self.is_view_source
         }
 
     def request_file(self):
@@ -130,15 +137,17 @@ class URL:
 def show(resp):
     scheme = resp["scheme"]
     body = resp["content"]
+    is_view_source = resp["is_view_source"]
     
     # parse tag
     if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
         in_tag = False
         for c in body:
-            if c == "<":
-                in_tag = True
-            elif c == ">":
-                in_tag = False
+            if not is_view_source:
+                if c == "<":
+                    in_tag = True
+                elif c == ">":
+                    in_tag = False
             elif not in_tag:
                 print(c, end="")
 
