@@ -6,6 +6,7 @@ class URLScheme:
     HTTP = "http"
     HTTPS = "https"
     FILE = "file"
+    DATA = "data"
 
 class URL:
     def __init__(self, url: str):
@@ -19,8 +20,14 @@ class URL:
         elif URLScheme.FILE in url:
             self.scheme = URLScheme.FILE
             sep = ":///"
+        elif URLScheme.DATA in url:
+            self.scheme = URLScheme.DATA
+            sep = ","
             
-        self.scheme, url = url.split(sep, 1)
+        if self.scheme == URLScheme.DATA:
+            _, url = url.split(sep, 1)
+        else:
+            self.scheme, url = url.split(sep, 1)
 
         # separate host and path (example.org and /index)
         if self.scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
@@ -37,16 +44,8 @@ class URL:
         elif self.scheme == URLScheme.FILE:
             self.path = url
 
-    def request_file(self):
-        file_list = []
-        files = os.listdir(self.path)
-        for file in files:
-            file_list.append(file)
-        
-        return {
-            "content": file_list,
-            "scheme": self.scheme
-        }
+        elif self.scheme == URLScheme.DATA:
+            self.content = url
 
     def request_http(self):
         # create socket
@@ -103,12 +102,31 @@ class URL:
             "scheme": self.scheme
         }
 
+    def request_file(self):
+        file_list = []
+        files = os.listdir(self.path)
+        for file in files:
+            file_list.append(file)
+        
+        return {
+            "content": file_list,
+            "scheme": self.scheme
+        }
+    
+    def request_data(self):
+        return {
+            "content": self.content,
+            "scheme": self.scheme
+        }
+
     def request(self):
         if self.scheme == URLScheme.HTTP or self.scheme == URLScheme.HTTPS:
             return self.request_http()
         elif self.scheme == URLScheme.FILE:
             return self.request_file()
-
+        elif self.scheme == URLScheme.DATA:
+            return self.request_data()
+        
 def show(resp):
     scheme = resp["scheme"]
     body = resp["content"]
@@ -127,6 +145,9 @@ def show(resp):
     elif scheme == URLScheme.FILE:
         for file in body:
             print(file)
+
+    elif scheme == URLScheme.DATA:
+        print(body)
 
     else:
         print(scheme)

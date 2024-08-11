@@ -23,6 +23,16 @@
       "args": [
         "file:///D:/"
       ]
-    }
+    },
+    {
+      "name": "Debug data",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "data:text/html,Hello world!"
+      ]
+    },
   ]
 }
