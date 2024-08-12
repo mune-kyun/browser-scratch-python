@@ -2,6 +2,8 @@ import os
 import socket
 import ssl
 
+from util import elapsed_ms
+
 class URLScheme:
     HTTP = "http"
     HTTPS = "https"
@@ -168,4 +170,7 @@ def load(url: URL):
 if __name__ == "__main__":
     import sys
 
-    load(URL(sys.argv[1]))
+    # load(URL(sys.argv[1]))
+
+    elapsed_time_ms, _ = elapsed_ms(load, URL(sys.argv[1]))
+    print("elapsed: {} ms".format(elapsed_time_ms))
