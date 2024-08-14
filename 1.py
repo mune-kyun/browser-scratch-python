@@ -13,12 +13,14 @@ class URLScheme:
 
 class URL:
     def __init__(self, url: str):
+        self.extract_url(url)
+
+    def extract_url(self, url):
         # view source mode
         self.is_view_source = URLScheme.VIEW_SOURCE in url
         if self.is_view_source is True:
             _, url = url.split(":", 1)
 
-        # TODO: Refactor for reuse
         # split url with scheme (http & example.org)
         if URLScheme.HTTP in url:
             self.scheme = URLScheme.HTTP
@@ -146,15 +148,17 @@ def show(resp):
     
     # parse tag
     if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
-        in_tag = False
-        for c in body:
-            if not is_view_source:
+        if is_view_source:
+            print(body)
+        else:
+            in_tag = False
+            for c in body:
                 if c == "<":
                     in_tag = True
                 elif c == ">":
                     in_tag = False
-            elif not in_tag:
-                print(c, end="")
+                elif not in_tag:
+                    print(c, end="")
 
     elif scheme == URLScheme.FILE:
         for file in body:
