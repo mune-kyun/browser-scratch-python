@@ -18,6 +18,7 @@ class URL:
         if self.is_view_source is True:
             _, url = url.split(":", 1)
 
+        # TODO: Refactor for reuse
         # split url with scheme (http & example.org)
         if URLScheme.HTTP in url:
             self.scheme = URLScheme.HTTP
@@ -97,6 +98,8 @@ class URL:
             if line == "\r\n": break
             header, value = line.split(":", 1)
             res_headers[header.casefold()] = value.strip()
+
+        # TODO: if location header exist, redirect
 
         # assert to exclude headers
         assert "transfer-encoding" not in res_headers

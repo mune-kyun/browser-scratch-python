@@ -44,5 +44,15 @@
         "view-source:http://example.org/"
       ]
     },
+    {
+      "name": "Debug redirect",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "http://browser.engineering/redirect"
+      ]
+    },
   ]
 }
