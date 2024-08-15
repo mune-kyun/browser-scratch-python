@@ -60,48 +60,55 @@ class URL:
 
     def request_http(self):
         # create socket
-        s = socket.socket(
-            family=socket.AF_INET,
-            type=socket.SOCK_STREAM,
-            proto=socket.IPPROTO_TCP
-        )
-
-        # pick port
-        if self.scheme == URLScheme.HTTP:
-            self.port = 80
-        elif self.scheme == URLScheme.HTTPS:
-            self.port = 443
-
-        # connect
-        s.connect((self.host, self.port))
-
-        # handle https
-        if self.scheme == URLScheme.HTTPS:
-            ctx = ssl.create_default_context()
-            s = ctx.wrap_socket(s, server_hostname=self.host)
-
-        # form request
-        req = "GET {} HTTP/1.0\r\n".format(self.path)
-        req += "Host: {}\r\n".format(self.host)
-        req += "Connection: {}\r\n".format("close")
-        req += "User-Agent: {}\r\n".format("mozilla")
-        req += "\r\n"
-        s.send(req.encode("utf-8"))
-
-        # get response
-        res = s.makefile("r", encoding="utf-8", newline="\r\n")
-
-        # split response
-        statusline = res.readline()
-        version, status, explanation = statusline.split(" ", 2)
-        res_headers = {}
+        s = None
+        res = ""
         while True:
-            line = res.readline()
-            if line == "\r\n": break
-            header, value = line.split(":", 1)
-            res_headers[header.casefold()] = value.strip()
+            s = socket.socket(
+                family=socket.AF_INET,
+                type=socket.SOCK_STREAM,
+                proto=socket.IPPROTO_TCP
+            )
+            # pick port
+            if self.scheme == URLScheme.HTTP:
+                self.port = 80
+            elif self.scheme == URLScheme.HTTPS:
+                self.port = 443
 
-        # TODO: if location header exist, redirect
+            # connect
+            s.connect((self.host, self.port))
+
+            # handle https
+            if self.scheme == URLScheme.HTTPS:
+                ctx = ssl.create_default_context()
+                s = ctx.wrap_socket(s, server_hostname=self.host)
+
+            # form request
+            req = "GET {} HTTP/1.0\r\n".format(self.path)
+            req += "Host: {}\r\n".format(self.host)
+            req += "Connection: {}\r\n".format("close")
+            req += "User-Agent: {}\r\n".format("mozilla")
+            req += "\r\n"
+            s.send(req.encode("utf-8"))
+
+            # get response
+            res = s.makefile("r", encoding="utf-8", newline="\r\n")
+
+            # split response
+            statusline = res.readline()
+            version, status, explanation = statusline.split(" ", 2)
+            res_headers = {}
+            while True:
+                line = res.readline()
+                if line == "\r\n": break
+                header, value = line.split(":", 1)
+                res_headers[header.casefold()] = value.strip()
+
+            # TODO: if location header exist, redirect
+            if "location" in res_headers:
+                s.close()
+                self.extract_url(res_headers["location"])
+            else:
+                break
 
         # assert to exclude headers
         assert "transfer-encoding" not in res_headers
@@ -144,7 +151,7 @@ class URL:
 def show(resp):
     scheme = resp["scheme"]
     body = resp["content"]
-    is_view_source = resp["is_view_source"]
+    is_view_source = resp.get("is_view_source", None)
     
     # parse tag
     if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
