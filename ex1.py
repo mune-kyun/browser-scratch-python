@@ -16,47 +16,52 @@ class URL:
         self.extract_url(url)
 
     def extract_url(self, url):
-        # view source mode
-        self.is_view_source = URLScheme.VIEW_SOURCE in url
-        if self.is_view_source is True:
-            _, url = url.split(":", 1)
+        try:
+            # view source mode
+            self.is_view_source = URLScheme.VIEW_SOURCE in url
+            if self.is_view_source is True:
+                _, url = url.split(":", 1)
 
-        # split url with scheme (http & example.org)
-        if URLScheme.HTTP in url:
-            self.scheme = URLScheme.HTTP
-            sep = "://"
-        elif URLScheme.HTTPS in url:
-            self.scheme = URLScheme.HTTPS
-            sep = "://"
-        elif URLScheme.FILE in url:
-            self.scheme = URLScheme.FILE
-            sep = ":///"
-        elif URLScheme.DATA in url:
-            self.scheme = URLScheme.DATA
-            sep = ","
+            # split url with scheme (http & example.org)
+            if URLScheme.HTTP in url:
+                self.scheme = URLScheme.HTTP
+                sep = "://"
+            elif URLScheme.HTTPS in url:
+                self.scheme = URLScheme.HTTPS
+                sep = "://"
+            elif URLScheme.FILE in url:
+                self.scheme = URLScheme.FILE
+                sep = ":///"
+            elif URLScheme.DATA in url:
+                self.scheme = URLScheme.DATA
+                sep = ","
 
-        if self.scheme == URLScheme.DATA:
-            _, url = url.split(sep, 1)
-        else:
-            self.scheme, url = url.split(sep, 1)
+            if self.scheme == URLScheme.DATA:
+                _, url = url.split(sep, 1)
+            else:
+                self.scheme, url = url.split(sep, 1)
 
-        # separate host and path (example.org and /index)
-        if self.scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
-            if "/" not in url:
-                url = url + "/"
-            self.host, url = url.split("/", 1)
-            self.path = "/" + url
+            # separate host and path (example.org and /index)
+            if self.scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
+                if "/" not in url:
+                    url = url + "/"
+                self.host, url = url.split("/", 1)
+                self.path = "/" + url
 
-            # get specified port
-            if ":" in self.host:
-                self.host, port = self.host.split(":", 1)
-                port = int(port)
+                # get specified port
+                if ":" in self.host:
+                    self.host, port = self.host.split(":", 1)
+                    port = int(port)
 
-        elif self.scheme == URLScheme.FILE:
-            self.path = url
+            elif self.scheme == URLScheme.FILE:
+                self.path = url
 
-        elif self.scheme == URLScheme.DATA:
-            self.content = url
+            elif self.scheme == URLScheme.DATA:
+                self.content = url
+        
+        except Exception as e:
+            print(f"Extract URL error: {e}")
+            self.is_malformed = True
 
     def request_http(self):
         # create socket
@@ -138,8 +143,17 @@ class URL:
             "content": self.content,
             "scheme": self.scheme
         }
+    
+    def request_malformed(self):
+        return {
+            "content": "",
+            "scheme": "malformed"
+        }
 
     def request(self):
+        if self.is_malformed:
+            return self.request_malformed()
+
         if self.scheme == URLScheme.HTTP or self.scheme == URLScheme.HTTPS:
             return self.request_http()
         elif self.scheme == URLScheme.FILE:
@@ -175,7 +189,7 @@ def lex(resp, mode="lex"):
         text = body
 
     else:
-        text = scheme
+        text = body
 
     if mode == "lex":
         return text

@@ -64,5 +64,15 @@
         "https://browser.engineering/examples/xiyouji.html"
       ]
     },
+    {
+      "name": "Debug malformed",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "htps:/browser.engineering/examples/xiyouji.html"
+      ]
+    },
   ]
 }
