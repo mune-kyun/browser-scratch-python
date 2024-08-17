@@ -47,9 +47,15 @@ def layout(text):
     for c in text:
         display_list.append((cursor_x, cursor_y, c))
         cursor_x += HSTEP
+
+        if "\n" in c:
+            cursor_x = HSTEP
+            cursor_y += 1.2*VSTEP
+        
         if cursor_x >= WIDTH + HSTEP:
             cursor_x = HSTEP
             cursor_y += VSTEP
+
     return display_list
 
 if __name__ == "__main__":
