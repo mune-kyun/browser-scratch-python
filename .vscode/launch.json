@@ -54,5 +54,15 @@
         "http://browser.engineering/redirect"
       ]
     },
+    {
+      "name": "Debug chinese site",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "https://browser.engineering/examples/xiyouji.html"
+      ]
+    },
   ]
 }

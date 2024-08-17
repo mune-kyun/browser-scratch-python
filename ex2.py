@@ -14,6 +14,7 @@ class Browser:
         )
         self.canvas.pack()
         self.scroll_val = 0
+        self.display_list = []
         self.bind_keys()
 
     def bind_keys(self):
@@ -21,10 +22,27 @@ class Browser:
         self.window.bind("<Up>", lambda e: self.scroll("<Up>"))
 
     def scroll(self, direction):
+        if len(self.display_list) == 0:
+            return
+        
         if direction == "<Down>":
-            self.scroll_val += SCROLL_STEP
+            char = self.display_list[len(self.display_list) - 1]
+            _, y, _ = char
+            
+            if self.y_below_screen(y):
+                self.scroll_val += SCROLL_STEP
+            else:
+                return
+            
         elif direction == "<Up>":
-            self.scroll_val -= SCROLL_STEP
+            char = self.display_list[0]
+            _, y, _ = char
+
+            if self.y_above_screen(y):
+                self.scroll_val -= SCROLL_STEP
+            else:
+                return
+
         self.canvas.delete("all")
         self.draw()
 
@@ -35,10 +53,18 @@ class Browser:
         self.display_list = layout(text)
         self.draw()
 
+    def y_above_screen(self, y):
+        y_dest = y - self.scroll_val
+        return y_dest < 0
+    
+    def y_below_screen(self, y):
+        y_dest = y - self.scroll_val
+        return y_dest > HEIGHT
+
     def draw(self):
         for x, y, c in self.display_list:
             y_dest = y - self.scroll_val
-            if y_dest < 0 or y_dest > HEIGHT: continue
+            if self.y_above_screen(y) or self.y_below_screen(y): continue
             self.canvas.create_text(x, y_dest, text=c)
 
 def layout(text):
