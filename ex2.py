@@ -69,7 +69,7 @@ class Browser:
 
     def load(self, url: URL):
         res = url.request()
-        self.text = lex(res["content"])
+        self.text = lex(res)
 
         self.display_list = self.layout(self.text)
         self.draw()

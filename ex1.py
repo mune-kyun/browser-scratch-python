@@ -103,7 +103,6 @@ class URL:
                 header, value = line.split(":", 1)
                 res_headers[header.casefold()] = value.strip()
 
-            # TODO: if location header exist, redirect
             if "location" in res_headers:
                 s.close()
                 self.extract_url(res_headers["location"])
@@ -148,7 +147,8 @@ class URL:
         elif self.scheme == URLScheme.DATA:
             return self.request_data()
         
-def show(resp):
+def lex(resp, mode="lex"):
+    text = ""
     scheme = resp["scheme"]
     body = resp["content"]
     is_view_source = resp.get("is_view_source", None)
@@ -156,7 +156,7 @@ def show(resp):
     # parse tag
     if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
         if is_view_source:
-            print(body)
+            text = body
         else:
             in_tag = False
             for c in body:
@@ -165,35 +165,26 @@ def show(resp):
                 elif c == ">":
                     in_tag = False
                 elif not in_tag:
-                    print(c, end="")
+                    text += c
 
     elif scheme == URLScheme.FILE:
         for file in body:
-            print(file)
+            text += file + "\n"
 
     elif scheme == URLScheme.DATA:
-        print(body)
+        text = body
 
     else:
-        print(scheme)
+        text = scheme
 
-def lex(body):
-    text = ""
-    in_tag = False
-    
-    for c in body:
-        if c == "<":
-            in_tag = True
-        elif c == ">":
-            in_tag = False
-        elif not in_tag:
-            text += c
-    
-    return text
+    if mode == "lex":
+        return text
+    else:
+        print(text)
     
 def load(url: URL):
     resp = url.request()
-    show(resp)
+    lex(resp, mode="show")
 
 if __name__ == "__main__":
     import sys
