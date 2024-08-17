@@ -1,24 +1,30 @@
 import tkinter
 from ex1 import URL, lex
 
+HEIGHT, WIDTH = 600, 800
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
 class Browser:
-    HEIGHT, WIDTH = 600, 800
-    HSTEP, VSTEP = 13, 18
-    SCROLL_STEP = 100
-
     def __init__(self):
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
-            width=self.WIDTH,
-            height=self.HEIGHT
+            width=WIDTH,
+            height=HEIGHT
         )
         self.canvas.pack()
-        self.scroll = 0
-        self.window.bind("<Down>", self.scrolldown)
+        self.scroll_val = 0
+        self.bind_keys()
 
-    def scrolldown(self, e):
-        self.scroll += self.SCROLL_STEP
+    def bind_keys(self):
+        self.window.bind("<Down>", lambda e: self.scroll("<Down>"))
+        self.window.bind("<Up>", lambda e: self.scroll("<Up>"))
+
+    def scroll(self, direction):
+        if direction == "<Down>":
+            self.scroll_val += SCROLL_STEP
+        elif direction == "<Up>":
+            self.scroll_val -= SCROLL_STEP
         self.canvas.delete("all")
         self.draw()
 
@@ -26,23 +32,25 @@ class Browser:
         res = url.request()
         text = lex(res["content"])
 
-        self.display_list = self.layout(text)
+        self.display_list = layout(text)
         self.draw()
 
-    def layout(self, text):
-        display_list = []
-        cursor_x, cursor_y = self.HSTEP, self.VSTEP
-        for c in text:
-            display_list.append((cursor_x, cursor_y, c))
-            cursor_x += self.HSTEP
-            if cursor_x >= self.WIDTH + self.HSTEP:
-                cursor_x = self.HSTEP
-                cursor_y += self.VSTEP
-        return display_list
-    
     def draw(self):
         for x, y, c in self.display_list:
-            self.canvas.create_text(x, y - self.scroll, text=c)
+            y_dest = y - self.scroll_val
+            if y_dest < 0 or y_dest > HEIGHT: continue
+            self.canvas.create_text(x, y_dest, text=c)
+
+def layout(text):
+    display_list = []
+    cursor_x, cursor_y = HSTEP, VSTEP
+    for c in text:
+        display_list.append((cursor_x, cursor_y, c))
+        cursor_x += HSTEP
+        if cursor_x >= WIDTH + HSTEP:
+            cursor_x = HSTEP
+            cursor_y += VSTEP
+    return display_list
 
 if __name__ == "__main__":
     import sys
