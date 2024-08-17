@@ -20,6 +20,7 @@ class Browser:
     def bind_keys(self):
         self.window.bind("<Down>", lambda e: self.scroll("<Down>"))
         self.window.bind("<Up>", lambda e: self.scroll("<Up>"))
+        self.canvas.bind("<MouseWheel>", self.handle_mouse_wheel)
 
     def scroll(self, direction):
         if len(self.display_list) == 0:
@@ -45,6 +46,12 @@ class Browser:
 
         self.canvas.delete("all")
         self.draw()
+
+    def handle_mouse_wheel(self, e):
+        if e.delta < 0:
+            self.scroll("<Down>")
+        elif e.delta > 0:
+            self.scroll("<Up>")
 
     def load(self, url: URL):
         res = url.request()
