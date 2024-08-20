@@ -13,6 +13,7 @@ class URLScheme:
 
 class URL:
     def __init__(self, url: str):
+        self.is_malformed = False
         self.extract_url(url)
 
     def extract_url(self, url):
