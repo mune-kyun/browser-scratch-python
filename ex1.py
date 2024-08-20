@@ -11,6 +11,14 @@ class URLScheme:
     DATA = "data"
     VIEW_SOURCE = "view-source"
 
+class Text:
+    def __init__(self, text):
+        self.text = text
+
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
+
 class URL:
     def __init__(self, url: str):
         self.is_malformed = False
@@ -163,7 +171,8 @@ class URL:
             return self.request_data()
         
 def lex(resp, mode="lex"):
-    text = ""
+    ret = []
+    buffer = ""
     scheme = resp["scheme"]
     body = resp["content"]
     is_view_source = resp.get("is_view_source", None)
@@ -171,31 +180,41 @@ def lex(resp, mode="lex"):
     # parse tag
     if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
         if is_view_source:
-            text = body
+            ret.append(body)
         else:
             in_tag = False
             for c in body:
+                # append normal text before meeting start tag
                 if c == "<":
                     in_tag = True
+                    if len(buffer) > 0:
+                        ret.append(Text(buffer))
+                    buffer = ""
+                # end of tag, then append
                 elif c == ">":
                     in_tag = False
-                elif not in_tag:
-                    text += c
+                    ret.append(Tag(buffer))
+                else:
+                    buffer += c
+            if in_tag:
+                buffer = "<" + buffer
+            if len(buffer) > 0:
+                ret.append(Text(buffer))
 
     elif scheme == URLScheme.FILE:
         for file in body:
-            text += file + "\n"
+            ret.append(file)
 
     elif scheme == URLScheme.DATA:
-        text = body
+        ret.append(body)
 
     else:
-        text = body
+        ret.append(body)
 
     if mode == "lex":
-        return text
+        return ret
     else:
-        print(text)
+        print(ret)
     
 def load(url: URL):
     resp = url.request()

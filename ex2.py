@@ -1,6 +1,6 @@
 import tkinter
 import tkinter.font
-from ex1 import URL, lex
+from ex1 import URL, lex, Tag, Text
 
 class Browser:
     HEIGHT, WIDTH = 600, 800
@@ -39,7 +39,7 @@ class Browser:
         if abs(self.WIDTH - width) > 9 or abs(self.HEIGHT - height) > 9:
             self.WIDTH = width
             self.HEIGHT = height
-            self.display_list = self.layout(self.text)
+            self.display_list = self.layout(self.tokens)
             self.canvas.delete("all")
             self.draw()
 
@@ -76,9 +76,8 @@ class Browser:
 
     def load(self, url: URL):
         res = url.request()
-        self.text = lex(res)
-
-        self.display_list = self.layout(self.text)
+        self.tokens = lex(res)
+        self.display_list = self.layout(self.tokens)
         self.draw()
 
     def y_above_screen(self, y):
@@ -90,25 +89,45 @@ class Browser:
         return y_dest > self.HEIGHT
 
     def draw(self):
-        for x, y, word in self.display_list:
+        for x, y, word, font in self.display_list:
             y_dest = y - self.scroll_val
             if self.y_above_screen(y) or self.y_below_screen(y): continue
-            self.canvas.create_text(x, y_dest, text=word, font=self.font, anchor="nw")
+            self.canvas.create_text(x, y_dest, text=word, font=font, anchor="nw")
 
-    def layout(self, text):
+    def layout(self, tokens):
+        style = "roman"
+        weight = "normal"
         display_list = []
         cursor_x, cursor_y = self.HSTEP, self.VSTEP
-        for word in text.split():
-            word_width = self.font.measure(word)
-            if cursor_x + word_width > self.WIDTH - self.HSTEP:
-                cursor_x = self.HSTEP
-                cursor_y += self.font.metrics("linespace") * 1.25
-            display_list.append((cursor_x, cursor_y, word))
+        for tok in tokens:
+            if isinstance(tok, Text):
+                for word in tok.text.split():
+                    font = tkinter.font.Font(
+                        size=16,
+                        weight=weight,
+                        slant=style
+                    )
+                    word_width = self.font.measure(word)
+                    if cursor_x + word_width > self.WIDTH - self.HSTEP:
+                        cursor_x = self.HSTEP
+                        cursor_y += self.font.metrics("linespace") * 1.25
+                    display_list.append((cursor_x, cursor_y, word, font))
+                    
+                    cursor_x += word_width + self.font.measure(" ")
+                    if "\n" in word:
+                        cursor_x = self.HSTEP
+                        cursor_y += self.font.metrics("linespace") * 1.25
             
-            cursor_x += word_width + self.font.measure(" ")
-            if "\n" in word:
-                cursor_x = self.HSTEP
-                cursor_y += self.font.metrics("linespace") * 1.25
+            elif isinstance(tok, Tag):
+                tag = tok.tag
+                if tag == "i":
+                    style = "italic"
+                elif tok.tag == "/i":
+                    style = "roman"
+                elif tok.tag == "b":
+                    weight = "bold"
+                elif tok.tag == "/b":
+                    weight = "normal"
 
         return display_list
 
