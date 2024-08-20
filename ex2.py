@@ -1,4 +1,5 @@
 import tkinter
+import tkinter.font
 from ex1 import URL, lex
 
 class Browser:
@@ -18,6 +19,12 @@ class Browser:
             expand=1
         )
         self.scroll_val = 0
+        self.font = tkinter.font.Font(
+            family="Times",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
         self.display_list = []
         self.bind_keys()
 
@@ -83,25 +90,25 @@ class Browser:
         return y_dest > self.HEIGHT
 
     def draw(self):
-        for x, y, c in self.display_list:
+        for x, y, word in self.display_list:
             y_dest = y - self.scroll_val
             if self.y_above_screen(y) or self.y_below_screen(y): continue
-            self.canvas.create_text(x, y_dest, text=c)
+            self.canvas.create_text(x, y_dest, text=word, font=self.font, anchor="nw")
 
     def layout(self, text):
         display_list = []
         cursor_x, cursor_y = self.HSTEP, self.VSTEP
-        for c in text:
-            display_list.append((cursor_x, cursor_y, c))
-            cursor_x += self.HSTEP
-
-            if "\n" in c:
+        for word in text.split():
+            word_width = self.font.measure(word)
+            if cursor_x + word_width > self.WIDTH - self.HSTEP:
                 cursor_x = self.HSTEP
-                cursor_y += 1.2*self.VSTEP
+                cursor_y += self.font.metrics("linespace") * 1.25
+            display_list.append((cursor_x, cursor_y, word))
             
-            if cursor_x >= self.WIDTH + self.HSTEP:
+            cursor_x += word_width + self.font.measure(" ")
+            if "\n" in word:
                 cursor_x = self.HSTEP
-                cursor_y += self.VSTEP
+                cursor_y += self.font.metrics("linespace") * 1.25
 
         return display_list
 

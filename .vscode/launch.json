@@ -31,7 +31,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "data:text/html,Hello world!"
+        "data:text/html,Hello world!, xyz aaasdf asdfdd asdfsdf thereisnewline\n asdfasl aaaa hel kibg kirbi the guy is so good im nt eaa s wdsf"
       ]
     },
     {
