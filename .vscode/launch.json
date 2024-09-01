@@ -11,7 +11,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "https://browser.engineering/examples/example1-simple.html"
+        "https://browser.engineering/text.html"
       ]
     },
     {
