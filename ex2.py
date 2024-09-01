@@ -5,17 +5,22 @@ from ex1 import URL, lex, Tag, Text
 class Layout:
     def __init__(self, tokens, hstep=13, vstep=18, height=600, width=800):
         self.display_list = []
+        self.line = []
+
         self.hstep = hstep
         self.vstep = vstep
         self.cursor_x = hstep
         self.cursor_y = vstep
-        self.weight = "normal"
-        self.style = "roman"
         self.width = width
         self.height = height
 
+        self.weight = "normal"
+        self.style = "roman"
+        self.size = 12
+
         for tok in tokens:
             self.handleToken(tok)
+        self.flush()
 
     def handleToken(self, tok):
         if isinstance(tok, Text):
@@ -33,38 +38,52 @@ class Layout:
                 self.weight = "bold"
             elif tag == "/b":
                 self.weight = "normal"
+            elif tag == "small":
+                self.size -= 2
+            elif tag == "/small":
+                self.size += 2
+            elif tag == "big":
+                self.size += 4
+            elif tag == "/big":
+                self.size -= 4
 
     def handleWord(self, word):
         font = tkinter.font.Font(
-            size=16,
+            size=self.size,
             weight=self.weight,
             slant=self.style
         )
         word_width = font.measure(word)
         if self.cursor_x + word_width > self.width - self.hstep:
-            self.cursor_x = self.hstep
-            self.cursor_y += font.metrics("linespace") * 1.25
-        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+            self.flush()
+        self.line.append((self.cursor_x, word, font))
         
         self.cursor_x += word_width + font.measure(" ")
         #TODO: needs to be tested since parsing \n doesnt work
         if "\n" in word:
-            self.cursor_x = self.hstep
-            self.cursor_y += font.metrics("linespace") * 1.25
+            self.flush()
 
-    def resize(self, tokens, height, width):
-        self.height = height
-        self.width = width
+    def flush(self):
+        if not self.line: return
+        metrics = [font.metrics() for x, word, font in self.line]
+        max_ascent = max([metric["ascent"] for metric in metrics])
+        max_descent = max([metric["descent"] for metric in metrics])
+        baseline = self.cursor_y + 1.25 * max_ascent
 
-        for tok in tokens:
-            self.handleToken(tok)
+        for x, word, font in self.line:
+            y = baseline - font.metrics("ascent")
+            self.display_list.append((x, y, word, font))
 
+        self.cursor_x = self.hstep
+        self.cursor_y += baseline + 1.25 * max_descent
+        self.line = []
 class Browser:
     HEIGHT, WIDTH = 600, 800
     HSTEP, VSTEP = 13, 18
     SCROLL_STEP = 100
     
     def __init__(self):
+        self.display_list = []
         self.hstep = self.HSTEP
         self.vstep = self.VSTEP
         self.width = self.WIDTH
@@ -93,21 +112,22 @@ class Browser:
         if abs(self.width - width) > 9 or abs(self.height - height) > 9:
             self.width = width
             self.height = height
-            self.layout.resize(
+            #TODO: handle this pls
+            self.display_list = Layout(
                 tokens=self.tokens,
-                width=width,
-                height=height
-            )
+                hstep=self.hstep,
+                vstep=self.vstep,
+                height=self.height,
+                width=self.width
+            ).display_list
             self.canvas.delete("all")
             self.draw()
 
-    def scroll(self, direction):
-        if self.layout is None:
-            return
-        if len(self.layout.display_list) == 0:
+    def scroll(self, direction): #TODO: fix console error
+        display_list = self.display_list
+        if len(display_list) == 0:
             return
         
-        display_list = self.layout.display_list
         if direction == "<Down>":
             char = display_list[len(display_list) - 1]
             _, y, _ = char
@@ -139,13 +159,13 @@ class Browser:
         res = url.request()
         self.tokens = lex(res)
         #TODO: refactor havent handle view source
-        self.layout = Layout(
+        self.display_list = Layout(
             tokens=self.tokens,
             hstep=self.hstep,
             vstep=self.vstep,
             height=self.height,
             width=self.width
-        )
+        ).display_list
         self.draw()
 
     def y_above_screen(self, y):
@@ -157,7 +177,7 @@ class Browser:
         return y_dest > self.height
 
     def draw(self):
-        display_list = self.layout.display_list
+        display_list = self.display_list
         for x, y, word, font in display_list:
             if self.y_above_screen(y) or self.y_below_screen(y): continue
             y_dest = y - self.scroll_val

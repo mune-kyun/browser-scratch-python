@@ -41,7 +41,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "test:text/html,Hello <small>a</small> <big>A</big>"
+        "test:text/html,Hello <small>aaaaaa</small> <big>Aaaaa</big>  <small>aaaaa</small> <big>Aaaaaaa</big>  <small>aaaaaaa</small> <big>aaaaaA</big>  <small>aaaaaa</small> <big>aaaaaaA</big> <small>end</small> <big>end</big>"
       ]
     },
     {
