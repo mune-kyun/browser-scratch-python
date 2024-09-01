@@ -194,6 +194,7 @@ def lex(resp, mode="lex"):
                 elif c == ">":
                     in_tag = False
                     ret.append(Tag(buffer))
+                    buffer = ""
                 else:
                     buffer += c
             if in_tag:

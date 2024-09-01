@@ -90,8 +90,8 @@ class Browser:
 
     def draw(self):
         for x, y, word, font in self.display_list:
-            y_dest = y - self.scroll_val
             if self.y_above_screen(y) or self.y_below_screen(y): continue
+            y_dest = y - self.scroll_val
             self.canvas.create_text(x, y_dest, text=word, font=font, anchor="nw")
 
     def layout(self, tokens):
@@ -101,6 +101,7 @@ class Browser:
         cursor_x, cursor_y = self.HSTEP, self.VSTEP
         for tok in tokens:
             if isinstance(tok, Text):
+                # TODO: this doesnt handle \n
                 for word in tok.text.split():
                     font = tkinter.font.Font(
                         size=16,
@@ -122,11 +123,11 @@ class Browser:
                 tag = tok.tag
                 if tag == "i":
                     style = "italic"
-                elif tok.tag == "/i":
+                elif tag == "/i":
                     style = "roman"
-                elif tok.tag == "b":
+                elif tag == "b":
                     weight = "bold"
-                elif tok.tag == "/b":
+                elif tag == "/b":
                     weight = "normal"
 
         return display_list
