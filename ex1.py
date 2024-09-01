@@ -10,6 +10,7 @@ class URLScheme:
     FILE = "file"
     DATA = "data"
     VIEW_SOURCE = "view-source"
+    TEST = "test"
 
 class Text:
     def __init__(self, text):
@@ -44,8 +45,13 @@ class URL:
             elif URLScheme.DATA in url:
                 self.scheme = URLScheme.DATA
                 sep = ","
+            elif URLScheme.TEST in url:
+                self.scheme = URLScheme.TEST
+                sep = ","
 
             if self.scheme == URLScheme.DATA:
+                _, url = url.split(sep, 1)
+            elif self.scheme == URLScheme.TEST:
                 _, url = url.split(sep, 1)
             else:
                 self.scheme, url = url.split(sep, 1)
@@ -66,6 +72,9 @@ class URL:
                 self.path = url
 
             elif self.scheme == URLScheme.DATA:
+                self.content = url
+
+            elif self.scheme == URLScheme.TEST:
                 self.content = url
         
         except Exception as e:
@@ -159,6 +168,12 @@ class URL:
             "scheme": "malformed"
         }
 
+    def request_test(self):
+        return {
+            "content": self.content,
+            "scheme": self.scheme
+        }
+
     def request(self):
         if self.is_malformed:
             return self.request_malformed()
@@ -169,6 +184,8 @@ class URL:
             return self.request_file()
         elif self.scheme == URLScheme.DATA:
             return self.request_data()
+        elif self.scheme == URLScheme.TEST:
+            return self.request_test()
         
 def lex(resp, mode="lex"):
     ret = []
@@ -178,7 +195,7 @@ def lex(resp, mode="lex"):
     is_view_source = resp.get("is_view_source", None)
     
     # parse tag
-    if scheme in {URLScheme.HTTP, URLScheme.HTTPS}:
+    if scheme in {URLScheme.HTTP, URLScheme.HTTPS, URLScheme.TEST}:
         if is_view_source:
             ret.append(body)
         else:

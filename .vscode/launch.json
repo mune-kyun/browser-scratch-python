@@ -35,6 +35,16 @@
       ]
     },
     {
+      "name": "Debug test html tags",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "test:text/html,Hello <small>a</small> <big>A</big>"
+      ]
+    },
+    {
       "name": "Debug view-source",
       "type": "debugpy",
       "request": "launch",
