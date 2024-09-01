@@ -204,7 +204,8 @@ def lex(resp, mode="lex"):
 
     elif scheme == URLScheme.FILE:
         for file in body:
-            ret.append(file)
+            ret.append(Text(file))
+            ret.append(Text("\n"))
 
     elif scheme == URLScheme.DATA:
         ret.append(body)

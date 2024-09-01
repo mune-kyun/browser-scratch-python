@@ -2,30 +2,84 @@ import tkinter
 import tkinter.font
 from ex1 import URL, lex, Tag, Text
 
+class Layout:
+    def __init__(self, tokens, hstep=13, vstep=18, height=600, width=800):
+        self.display_list = []
+        self.hstep = hstep
+        self.vstep = vstep
+        self.cursor_x = hstep
+        self.cursor_y = vstep
+        self.weight = "normal"
+        self.style = "roman"
+        self.width = width
+        self.height = height
+
+        for tok in tokens:
+            self.handleToken(tok)
+
+    def handleToken(self, tok):
+        if isinstance(tok, Text):
+            #TODO: this doesnt handle \n
+            for word in tok.text.split():
+                self.handleWord(word)
+        
+        elif isinstance(tok, Tag):
+            tag = tok.tag
+            if tag == "i":
+                self.style = "italic"
+            elif tag == "/i":
+                self.style = "roman"
+            elif tag == "b":
+                self.weight = "bold"
+            elif tag == "/b":
+                self.weight = "normal"
+
+    def handleWord(self, word):
+        font = tkinter.font.Font(
+            size=16,
+            weight=self.weight,
+            slant=self.style
+        )
+        word_width = font.measure(word)
+        if self.cursor_x + word_width > self.width - self.hstep:
+            self.cursor_x = self.hstep
+            self.cursor_y += font.metrics("linespace") * 1.25
+        self.display_list.append((self.cursor_x, self.cursor_y, word, font))
+        
+        self.cursor_x += word_width + font.measure(" ")
+        #TODO: needs to be tested since parsing \n doesnt work
+        if "\n" in word:
+            self.cursor_x = self.hstep
+            self.cursor_y += font.metrics("linespace") * 1.25
+
+    def resize(self, tokens, height, width):
+        self.height = height
+        self.width = width
+
+        for tok in tokens:
+            self.handleToken(tok)
+
 class Browser:
     HEIGHT, WIDTH = 600, 800
     HSTEP, VSTEP = 13, 18
     SCROLL_STEP = 100
     
     def __init__(self):
+        self.hstep = self.HSTEP
+        self.vstep = self.VSTEP
+        self.width = self.WIDTH
+        self.height = self.HEIGHT
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
-            width=self.WIDTH,
-            height=self.HEIGHT
+            width=self.width,
+            height=self.height
         )
         self.canvas.pack(
             fill=tkinter.BOTH,
             expand=1
         )
         self.scroll_val = 0
-        self.font = tkinter.font.Font(
-            family="Times",
-            size=16,
-            weight="bold",
-            slant="italic",
-        )
-        self.display_list = []
         self.bind_keys()
 
     def bind_keys(self):
@@ -36,19 +90,26 @@ class Browser:
 
     def handle_configure(self, e):
         width, height = e.width, e.height
-        if abs(self.WIDTH - width) > 9 or abs(self.HEIGHT - height) > 9:
-            self.WIDTH = width
-            self.HEIGHT = height
-            self.display_list = self.layout(self.tokens)
+        if abs(self.width - width) > 9 or abs(self.height - height) > 9:
+            self.width = width
+            self.height = height
+            self.layout.resize(
+                tokens=self.tokens,
+                width=width,
+                height=height
+            )
             self.canvas.delete("all")
             self.draw()
 
     def scroll(self, direction):
-        if len(self.display_list) == 0:
+        if self.layout is None:
+            return
+        if len(self.layout.display_list) == 0:
             return
         
+        display_list = self.layout.display_list
         if direction == "<Down>":
-            char = self.display_list[len(self.display_list) - 1]
+            char = display_list[len(display_list) - 1]
             _, y, _ = char
             
             if self.y_below_screen(y):
@@ -57,7 +118,7 @@ class Browser:
                 return
             
         elif direction == "<Up>":
-            char = self.display_list[0]
+            char = display_list[0]
             _, y, _ = char
 
             if self.y_above_screen(y):
@@ -77,7 +138,14 @@ class Browser:
     def load(self, url: URL):
         res = url.request()
         self.tokens = lex(res)
-        self.display_list = self.layout(self.tokens)
+        #TODO: refactor havent handle view source
+        self.layout = Layout(
+            tokens=self.tokens,
+            hstep=self.hstep,
+            vstep=self.vstep,
+            height=self.height,
+            width=self.width
+        )
         self.draw()
 
     def y_above_screen(self, y):
@@ -86,51 +154,14 @@ class Browser:
     
     def y_below_screen(self, y):
         y_dest = y - self.scroll_val
-        return y_dest > self.HEIGHT
+        return y_dest > self.height
 
     def draw(self):
-        for x, y, word, font in self.display_list:
+        display_list = self.layout.display_list
+        for x, y, word, font in display_list:
             if self.y_above_screen(y) or self.y_below_screen(y): continue
             y_dest = y - self.scroll_val
             self.canvas.create_text(x, y_dest, text=word, font=font, anchor="nw")
-
-    def layout(self, tokens):
-        style = "roman"
-        weight = "normal"
-        display_list = []
-        cursor_x, cursor_y = self.HSTEP, self.VSTEP
-        for tok in tokens:
-            if isinstance(tok, Text):
-                # TODO: this doesnt handle \n
-                for word in tok.text.split():
-                    font = tkinter.font.Font(
-                        size=16,
-                        weight=weight,
-                        slant=style
-                    )
-                    word_width = self.font.measure(word)
-                    if cursor_x + word_width > self.WIDTH - self.HSTEP:
-                        cursor_x = self.HSTEP
-                        cursor_y += self.font.metrics("linespace") * 1.25
-                    display_list.append((cursor_x, cursor_y, word, font))
-                    
-                    cursor_x += word_width + self.font.measure(" ")
-                    if "\n" in word:
-                        cursor_x = self.HSTEP
-                        cursor_y += self.font.metrics("linespace") * 1.25
-            
-            elif isinstance(tok, Tag):
-                tag = tok.tag
-                if tag == "i":
-                    style = "italic"
-                elif tag == "/i":
-                    style = "roman"
-                elif tag == "b":
-                    weight = "bold"
-                elif tag == "/b":
-                    weight = "normal"
-
-        return display_list
 
 if __name__ == "__main__":
     import sys
