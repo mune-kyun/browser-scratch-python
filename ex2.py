@@ -122,7 +122,6 @@ class Browser:
         if abs(self.width - width) > 9 or abs(self.height - height) > 9:
             self.width = width
             self.height = height
-            #TODO: handle this pls
             self.display_list = Layout(
                 tokens=self.tokens,
                 hstep=self.hstep,
