@@ -86,6 +86,7 @@ class Layout:
         self.cursor_x = self.hstep
         self.cursor_y += baseline + 1.25 * max_descent
         self.line = []
+
 class Browser:
     HEIGHT, WIDTH = 600, 800
     HSTEP, VSTEP = 13, 18
@@ -132,14 +133,14 @@ class Browser:
             self.canvas.delete("all")
             self.draw()
 
-    def scroll(self, direction): #TODO: fix console error
+    def scroll(self, direction):
         display_list = self.display_list
         if len(display_list) == 0:
             return
         
         if direction == "<Down>":
             char = display_list[len(display_list) - 1]
-            _, y, _ = char
+            _, y, _, _ = char
             
             if self.y_below_screen(y):
                 self.scroll_val += self.SCROLL_STEP
@@ -148,7 +149,7 @@ class Browser:
             
         elif direction == "<Up>":
             char = display_list[0]
-            _, y, _ = char
+            _, y, _, _ = char
 
             if self.y_above_screen(y):
                 self.scroll_val -= self.SCROLL_STEP
