@@ -59,6 +59,11 @@ class Layout:
                 self.size += 4
             elif tag == "/big":
                 self.size -= 4
+            elif tag == "br" or tag == "br/":
+                self.flush()
+            elif tag == "/p":
+                self.flush()
+                self.cursor_y += self.vstep
 
     def handleWord(self, word):
         font = get_font(self.size, self.weight, self.style)
@@ -70,7 +75,7 @@ class Layout:
         self.cursor_x += word_width + font.measure(" ")
         #TODO: needs to be tested since parsing \n doesnt work
         if "\n" in word:
-            self.flush()
+            pass
 
     def flush(self):
         if not self.line: return
@@ -84,7 +89,7 @@ class Layout:
             self.display_list.append((x, y, word, font))
 
         self.cursor_x = self.hstep
-        self.cursor_y += baseline + 1.25 * max_descent
+        self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
 
 class Browser:
@@ -119,7 +124,7 @@ class Browser:
 
     def handle_configure(self, e):
         width, height = e.width, e.height
-        if abs(self.width - width) > 9 or abs(self.height - height) > 9:
+        if abs(self.width - width) > 1 or abs(self.height - height) > 1:
             self.width = width
             self.height = height
             self.display_list = Layout(
