@@ -61,7 +61,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "http://browser.engineering/redirect"
+        "http://browser.engineering/redirect3"
       ]
     },
     {
