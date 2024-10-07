@@ -13,12 +13,110 @@ class URLScheme:
     TEST = "test"
 
 class Text:
-    def __init__(self, text):
+    def __init__(self, text, parent):
         self.text = text
+        self.children = []
+        self.parent = parent
+    
+    def __repr__(self):
+        return repr(self.text)
 
-class Tag:
-    def __init__(self, tag):
+class Element:
+    def __init__(self, tag, attributes, parent):
         self.tag = tag
+        self.children = []
+        self.parent = parent
+        self.attributes = attributes
+    
+    def __repr__(self):
+        return "<" + self.tag + ">"
+
+class HTMLParser:
+    SELF_CLOSING_TAGS = [
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    ]
+
+    def __init__(self, body):
+        self.body = body
+        self.unfinished = []
+
+    def parse(self):
+        buffer = ""
+        in_tag = False
+
+        for c in self.body:
+            # append normal text before meeting start tag
+            if c == "<":
+                in_tag = True
+                if buffer: self.add_text(buffer)
+                buffer = ""
+            # end of tag, then append
+            elif c == ">":
+                in_tag = False
+                self.add_tag(buffer)
+                buffer = ""
+            else:
+                buffer += c
+
+        if in_tag:
+            buffer = "<" + buffer
+            self.add_text(buffer)
+        
+        return self.finish()
+    
+    def add_text(self, text):
+        if len(self.unfinished) < 1: return
+        parent = self.unfinished[-1]
+        node = Text(text, parent)
+        parent.children.append(node)
+
+    def add_tag(self, tag):
+        tag, attributes = self.get_attributes(tag)
+        if tag.startswith("!"): return # skip !doctype
+        elif tag.isspace(): return # skip \n or whitespace after doctype
+        elif tag in self.SELF_CLOSING_TAGS:
+            parent = self.unfinished[-1]
+            node = Element(tag, attributes, parent)
+            parent.children.append(node)
+        elif tag.startswith("/"):
+            if len(self.unfinished) == 1: return
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+        else:
+            parent = self.unfinished[-1] if self.unfinished else None
+            node = Element(tag, attributes, parent)
+            self.unfinished.append(node)
+
+    def get_attributes(self, text):
+        parts = text.split()
+        tag = parts[0].casefold()
+        attributes = {}
+
+        for attrpair in parts[1:]:
+            if "=" in attrpair:
+                key, value = attrpair.split("=", 1)
+                if len(value) > 2 and value[0] in ["'", "\""]:
+                    value = value[1:-1]
+                attributes[key.casefold()] = value
+            else:
+                attributes[attrpair.casefold()] = ""
+
+        return tag, attributes
+
+    def finish(self):
+        while len(self.unfinished) > 1:
+            node = self.unfinished.pop()
+            parent = self.unfinished[-1]
+            parent.children.append(node)
+        return self.unfinished.pop()
+
+def print_tree(node, indent=0):
+    print(" " * indent, node)
+    if isinstance(node, Element): print(" " * indent, f"({node.attributes})")
+    for child in node.children:
+        print_tree(child, indent + 2)
 
 class URL:
     def __init__(self, url: str):
@@ -187,6 +285,7 @@ class URL:
         elif self.scheme == URLScheme.TEST:
             return self.request_test()
         
+# TODO: move completely to build tree
 def lex(resp, mode="lex"):
     ret = []
     buffer = ""
@@ -210,7 +309,7 @@ def lex(resp, mode="lex"):
                 # end of tag, then append
                 elif c == ">":
                     in_tag = False
-                    ret.append(Tag(buffer))
+                    ret.append(Element(buffer))
                     buffer = ""
                 else:
                     buffer += c
@@ -242,7 +341,7 @@ def load(url: URL):
 if __name__ == "__main__":
     import sys
 
-    # load(URL(sys.argv[1]))
-
-    elapsed_time_ms, _ = elapsed_ms(load, URL(sys.argv[1]))
-    print("elapsed: {} ms".format(elapsed_time_ms))
+    url = sys.argv[1]
+    body = URL(url).request()
+    nodes = HTMLParser(body["content"]).parse()
+    print_tree(nodes)
