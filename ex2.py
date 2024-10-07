@@ -1,6 +1,6 @@
 import tkinter
 import tkinter.font
-from ex1 import URL, lex, Tag, Text
+from ex1 import URL, lex, Element, Text, HTMLParser
 
 FONTS = {}
 
@@ -16,7 +16,7 @@ def get_font(size, weight, style):
     return FONTS[key]
 
 class Layout:
-    def __init__(self, tokens, hstep=13, vstep=18, height=600, width=800):
+    def __init__(self, tokens=None, hstep=13, vstep=18, height=600, width=800, nodes=None):
         self.display_list = []
         self.line = []
 
@@ -31,10 +31,14 @@ class Layout:
         self.style = "roman"
         self.size = 12
 
-        for tok in tokens:
-            self.handleToken(tok)
+        if nodes:
+            self.recurse(nodes)
+        else:
+            for tok in tokens:
+                self.handleToken(tok)
         self.flush()
 
+    # This method is obsolete since we already use html tree
     def handleToken(self, tok):
         if isinstance(tok, Text):
             #TODO: this doesnt handle \n
@@ -91,6 +95,42 @@ class Layout:
         self.cursor_x = self.hstep
         self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
+
+    def open_tag(self, tag):
+        if tag == "i":
+            self.style = "italic"
+        elif tag == "b":
+            self.weight = "bold"
+        elif tag == "small":
+            self.size -= 2
+        elif tag == "big":
+            self.size += 4
+        elif tag == "br":
+            self.flush()
+    
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
+            self.weight = "normal"
+        elif tag == "small":
+            self.size += 2
+        elif tag == "big":
+            self.size -= 4
+        elif tag == "p":
+            self.flush()
+            self.cursor_y += self.vstep
+
+    def recurse(self, node):
+        if isinstance(node, Text):
+            for word in node.text.split():
+                self.handleWord(word)
+
+        else:
+            self.open_tag(node.tag)
+            for child in node.children:
+                self.recurse(child)
+            self.close_tag(node.tag)
 
 class Browser:
     HEIGHT, WIDTH = 600, 800
@@ -171,14 +211,15 @@ class Browser:
 
     def load(self, url: URL):
         res = url.request()
-        self.tokens = lex(res)
+        self.nodes = HTMLParser(res["content"]).parse()
+        # self.tokens = lex(res)
         #TODO: refactor havent handle view source
         self.display_list = Layout(
-            tokens=self.tokens,
             hstep=self.hstep,
             vstep=self.vstep,
             height=self.height,
-            width=self.width
+            width=self.width,
+            nodes=self.nodes
         ).display_list
         self.draw()
 

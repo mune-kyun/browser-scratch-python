@@ -36,6 +36,10 @@ class HTMLParser:
         "area", "base", "br", "col", "embed", "hr", "img", "input",
         "link", "meta", "param", "source", "track", "wbr",
     ]
+    HEAD_TAGS = [
+        "base", "basefont", "bgsound", "noscript",
+        "link", "meta", "title", "style", "script",
+    ]
 
     def __init__(self, body):
         self.body = body
@@ -67,15 +71,19 @@ class HTMLParser:
     
     def add_text(self, text):
         if len(self.unfinished) < 1: return
+        if text.isspace(): return
+
         parent = self.unfinished[-1]
         node = Text(text, parent)
         parent.children.append(node)
 
     def add_tag(self, tag):
         tag, attributes = self.get_attributes(tag)
+        
         if tag.startswith("!"): return # skip !doctype
-        elif tag.isspace(): return # skip \n or whitespace after doctype
-        elif tag in self.SELF_CLOSING_TAGS:
+        if tag.isspace(): return # skip \n or whitespace after doctype
+        
+        if tag in self.SELF_CLOSING_TAGS:
             parent = self.unfinished[-1]
             node = Element(tag, attributes, parent)
             parent.children.append(node)
@@ -105,11 +113,33 @@ class HTMLParser:
 
         return tag, attributes
 
+    def implicit_tags(self, tag):
+        while True:
+            open_tags = [node.tag for node in self.unfinished]
+
+            if open_tags == [] and tag != "html":
+                self.add_tag("html")
+            elif open_tags == ["html"] \
+                and tag not in ["head", "body", "/html"]:
+                if tag in self.HEAD_TAGS:
+                    self.add_tag("head")
+                else:
+                    self.add_tag("body")
+            elif open_tags == ["html", "head"] and \
+                tag not in ["/head"] + self.HEAD_TAGS:
+                self.add_tag("/head")
+            else:
+                break
+
     def finish(self):
+        if not self.unfinished:
+            self.implicit_tags(None)
+
         while len(self.unfinished) > 1:
             node = self.unfinished.pop()
             parent = self.unfinished[-1]
             parent.children.append(node)
+
         return self.unfinished.pop()
 
 def print_tree(node, indent=0):

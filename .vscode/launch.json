@@ -91,7 +91,7 @@
       "program": "${file}",
       "console": "integratedTerminal",
       "args": [
-        "https://browser.engineering/text.html"
+        "https://browser.engineering/html.html"
       ]
     },
     {
