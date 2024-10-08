@@ -45,6 +45,7 @@ class HTMLParser:
         self.body = body
         self.unfinished = []
 
+    # Process body per character
     def parse(self):
         buffer = ""
         in_tag = False
@@ -69,20 +70,26 @@ class HTMLParser:
         
         return self.finish()
     
+    # Process text type node
     def add_text(self, text):
         if len(self.unfinished) < 1: return
         if text.isspace(): return
+
+        self.implicit_tags(None) # guard to add missing body, head, or mandatory tags
 
         parent = self.unfinished[-1]
         node = Text(text, parent)
         parent.children.append(node)
 
+    # Process html tag type node
     def add_tag(self, tag):
         tag, attributes = self.get_attributes(tag)
         
         if tag.startswith("!"): return # skip !doctype
         if tag.isspace(): return # skip \n or whitespace after doctype
         
+        self.implicit_tags(tag) # guard to add missing body, head, or mandatory tags
+
         if tag in self.SELF_CLOSING_TAGS:
             parent = self.unfinished[-1]
             node = Element(tag, attributes, parent)
@@ -97,6 +104,7 @@ class HTMLParser:
             node = Element(tag, attributes, parent)
             self.unfinished.append(node)
 
+    # Extract attributes from it's tag
     def get_attributes(self, text):
         parts = text.split()
         tag = parts[0].casefold()
@@ -113,6 +121,7 @@ class HTMLParser:
 
         return tag, attributes
 
+    # Add missing mandatory tags such as html, head, body
     def implicit_tags(self, tag):
         while True:
             open_tags = [node.tag for node in self.unfinished]
@@ -125,12 +134,13 @@ class HTMLParser:
                     self.add_tag("head")
                 else:
                     self.add_tag("body")
-            elif open_tags == ["html", "head"] and \
-                tag not in ["/head"] + self.HEAD_TAGS:
+            elif open_tags == ["html", "head"] \
+                and tag not in ["/head"] + self.HEAD_TAGS:
                 self.add_tag("/head")
             else:
                 break
 
+    # Make sure that only one parent node is returned
     def finish(self):
         if not self.unfinished:
             self.implicit_tags(None)
@@ -316,6 +326,7 @@ class URL:
             return self.request_test()
         
 # TODO: move completely to build tree
+# Get Text, Element from a body / Normal parsing
 def lex(resp, mode="lex"):
     ret = []
     buffer = ""

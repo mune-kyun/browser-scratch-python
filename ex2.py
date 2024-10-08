@@ -81,6 +81,10 @@ class Layout:
         if "\n" in word:
             pass
 
+    '''
+    1. Flush [array]line
+    2. Append the line to [array]display_list
+    '''
     def flush(self):
         if not self.line: return
         metrics = [font.metrics() for x, word, font in self.line]
@@ -96,6 +100,7 @@ class Layout:
         self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
 
+    # Change style
     def open_tag(self, tag):
         if tag == "i":
             self.style = "italic"
@@ -108,6 +113,7 @@ class Layout:
         elif tag == "br":
             self.flush()
     
+    # Revert style
     def close_tag(self, tag):
         if tag == "i":
             self.style = "roman"
