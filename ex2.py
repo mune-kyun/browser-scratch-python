@@ -174,11 +174,11 @@ class Browser:
             self.width = width
             self.height = height
             self.display_list = Layout(
-                tokens=self.tokens,
                 hstep=self.hstep,
                 vstep=self.vstep,
                 height=self.height,
-                width=self.width
+                width=self.width,
+                nodes=self.nodes
             ).display_list
             self.canvas.delete("all")
             self.draw()
