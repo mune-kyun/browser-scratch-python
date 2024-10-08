@@ -18,5 +18,8 @@ https://browser.engineering/graphics.html
 
 2-7 Alternate text direction. Not all languages read and lay out from left to right. Arabic, Persian, and Hebrew are good examples of right-to-left languages. Implement basic support for this with a command-line flag to your browser.Once we get to Chapter 4 you could write it in terms of the dir attribute on the <body> element. English sentences should still lay out left-to-right, but they should grow from the right side of the screen (load this example in your favorite browser to see what I mean).
 
+https://browser.engineering/text.html
 skip 3rd one since trivial
 
+https://browser.engineering/html.html
+skip 4
