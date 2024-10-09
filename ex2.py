@@ -15,28 +15,121 @@ def get_font(size, weight, style):
         FONTS[key] = font
     return FONTS[key]
 
-class Layout:
-    def __init__(self, tokens=None, hstep=13, vstep=18, height=600, width=800, nodes=None):
+BLOCK_ELEMENTS = [
+    "html", "body", "article", "section", "nav", "aside",
+    "h1", "h2", "h3", "h4", "h5", "h6", "hgroup", "header",
+    "footer", "address", "p", "hr", "pre", "blockquote",
+    "ol", "ul", "menu", "li", "dl", "dt", "dd", "figure",
+    "figcaption", "main", "div", "table", "form", "fieldset",
+    "legend", "details", "summary"
+]
+
+HEIGHT, WIDTH = 600, 800
+HSTEP, VSTEP = 13, 18
+SCROLL_STEP = 100
+
+class DocumentLayout:
+    def __init__(self, node):
+        self.node = node
+        self.parent = None
+        self.children = []
+
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
+
+    def layout(self):
+        self.width = WIDTH - 2*HSTEP
+        self.x = HSTEP
+        self.y = VSTEP
+
+        child = BlockLayout(self.node, self, None)
+        self.children.append(child)
+        child.layout()
+
+        self.height = child.height
+
+    def paint(self):
+        return []
+
+class BlockLayout:
+    def __init__(self, node, parent, previous, hstep=13, vstep=18):
         self.display_list = []
-        self.line = []
 
         self.hstep = hstep
         self.vstep = vstep
-        self.cursor_x = hstep
-        self.cursor_y = vstep
-        self.width = width
-        self.height = height
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
 
         self.weight = "normal"
         self.style = "roman"
         self.size = 12
 
-        if nodes:
-            self.recurse(nodes)
+        self.node = node    # HTML tree
+        self.parent = parent
+        self.previous = previous
+        self.children = []  # Layout tree
+    
+    def layout(self):
+        # Set x and width to parent
+        self.x = self.parent.x
+        self.width = self.parent.width
+
+        # Set y taking account siblings height or parent's height
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
         else:
-            for tok in tokens:
-                self.handleToken(tok)
-        self.flush()
+            self.y = self.parent.y
+
+        mode = self.layout_mode()
+        
+        if mode == "block":
+            previous = None
+
+            for child in self.node.children:
+                next = BlockLayout(child, self, previous)
+                self.children.append(next)
+                previous = next
+        else:
+            self.cursor_x = 0
+            self.cursor_y = 0
+            self.weight = "normal"
+            self.style = "roman"
+            self.size = 12
+            
+            self.line = []
+            self.recurse(self.node)
+            self.flush()
+
+        for child in self.children:
+            child.layout()
+        
+        if mode == "block":
+            self.height = sum([child.height for child in self.children])
+        else:
+            self.height = self.cursor_y
+
+    def layout_intermediate(self):
+        previous = None
+        for child in self.node.children:
+            next = BlockLayout(child, self, previous)
+            self.children.append(next)
+            previous = next
+
+    def layout_mode(self):
+        if isinstance(self.node, Text):
+            return "inline"
+        elif any([isinstance(child, Element) and \
+                  child.tag in BLOCK_ELEMENTS
+                  for child in self.node.children]):
+            return "block"
+        elif self.node.children:
+            return "inline"
+        else:
+            return "block"
 
     # This method is obsolete since we already use html tree
     def handleToken(self, tok):
@@ -69,10 +162,11 @@ class Layout:
                 self.flush()
                 self.cursor_y += self.vstep
 
+    # Determine coordinate of word
     def handleWord(self, word):
         font = get_font(self.size, self.weight, self.style)
         word_width = font.measure(word)
-        if self.cursor_x + word_width > self.width - self.hstep:
+        if self.cursor_x + word_width > self.width:
             self.flush()
         self.line.append((self.cursor_x, word, font))
         
@@ -92,11 +186,12 @@ class Layout:
         max_descent = max([metric["descent"] for metric in metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
 
-        for x, word, font in self.line:
-            y = baseline - font.metrics("ascent")
+        for rel_x, word, font in self.line:
+            x = self.x + rel_x
+            y = self.y + baseline - font.metrics("ascent")
             self.display_list.append((x, y, word, font))
 
-        self.cursor_x = self.hstep
+        self.cursor_x = 0
         self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
 
@@ -127,6 +222,7 @@ class Layout:
             self.flush()
             self.cursor_y += self.vstep
 
+    # Recursively convert (calling handleWord and flush) to x, y, font, blabla
     def recurse(self, node):
         if isinstance(node, Text):
             for word in node.text.split():
@@ -138,17 +234,22 @@ class Layout:
                 self.recurse(child)
             self.close_tag(node.tag)
 
+    def paint(self):
+        return self.display_list
+
+def paint_tree(layout_object, display_list):
+    display_list.extend(layout_object.paint())
+
+    for child in layout_object.children:
+        paint_tree(child, display_list)
+
 class Browser:
-    HEIGHT, WIDTH = 600, 800
-    HSTEP, VSTEP = 13, 18
-    SCROLL_STEP = 100
-    
     def __init__(self):
         self.display_list = []
-        self.hstep = self.HSTEP
-        self.vstep = self.VSTEP
-        self.width = self.WIDTH
-        self.height = self.HEIGHT
+        self.hstep = HSTEP
+        self.vstep = VSTEP
+        self.width = WIDTH
+        self.height = HEIGHT
         self.window = tkinter.Tk()
         self.canvas = tkinter.Canvas(
             self.window,
@@ -173,13 +274,13 @@ class Browser:
         if abs(self.width - width) > 1 or abs(self.height - height) > 1:
             self.width = width
             self.height = height
-            self.display_list = Layout(
-                hstep=self.hstep,
-                vstep=self.vstep,
-                height=self.height,
-                width=self.width,
-                nodes=self.nodes
-            ).display_list
+            # self.display_list = Layout(
+            #     hstep=self.hstep,
+            #     vstep=self.vstep,
+            #     height=self.height,
+            #     width=self.width,
+            #     nodes=self.nodes
+            # ).display_list
             self.canvas.delete("all")
             self.draw()
 
@@ -193,7 +294,7 @@ class Browser:
             _, y, _, _ = char
             
             if self.y_below_screen(y):
-                self.scroll_val += self.SCROLL_STEP
+                self.scroll_val += SCROLL_STEP
             else:
                 return
             
@@ -202,7 +303,7 @@ class Browser:
             _, y, _, _ = char
 
             if self.y_above_screen(y):
-                self.scroll_val -= self.SCROLL_STEP
+                self.scroll_val -= SCROLL_STEP
             else:
                 return
 
@@ -220,13 +321,9 @@ class Browser:
         self.nodes = HTMLParser(res["content"]).parse()
         # self.tokens = lex(res)
         #TODO: refactor havent handle view source
-        self.display_list = Layout(
-            hstep=self.hstep,
-            vstep=self.vstep,
-            height=self.height,
-            width=self.width,
-            nodes=self.nodes
-        ).display_list
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
+        paint_tree(self.document, self.display_list)
         self.draw()
 
     def y_above_screen(self, y):
