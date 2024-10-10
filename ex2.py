@@ -30,12 +30,12 @@ SCROLL_STEP = 100
 
 class DocumentLayout:
     def __init__(self, node):
-        self.node = node
+        self.node = node    # HTML tree
         self.parent = None
-        self.children = []
+        self.children = []  # Store layout tree
 
-        self.x = None
-        self.y = None
+        self.x = None   # Start position x
+        self.y = None   # Start position y
         self.width = None
         self.height = None
 
@@ -44,21 +44,29 @@ class DocumentLayout:
         self.x = HSTEP
         self.y = VSTEP
 
+        '''
+        - Make the node child as blocklayout
+        - then recursive to do the same for the child
+        '''
         child = BlockLayout(self.node, self, None)
         self.children.append(child)
         child.layout()
 
+        '''
+        Always count height at the end after recursive since total height can only be calculated 
+        after knowing the child height (kinda like height: fit-content)
+        '''
         self.height = child.height
 
     def paint(self):
         return []
 
 class BlockLayout:
-    def __init__(self, node, parent, previous, hstep=13, vstep=18):
+    def __init__(self, node, parent, previous):
         self.display_list = []
 
-        self.hstep = hstep
-        self.vstep = vstep
+        self.hstep = HSTEP
+        self.vstep = VSTEP
         self.x = None
         self.y = None
         self.width = None
@@ -73,12 +81,17 @@ class BlockLayout:
         self.previous = previous
         self.children = []  # Layout tree
     
+    '''
+    - Create layout tree
+    - Also creating HTML tree per leaf, so now each leaf contain sub tree of the whole HTML tree
+    - So, now per-BlockLayout has it's own smaller tree
+    '''
     def layout(self):
-        # Set x and width to parent
+        # Set x starting point and width to parent
         self.x = self.parent.x
         self.width = self.parent.width
 
-        # Set y taking account siblings height or parent's height
+        # Set y starting point taking account siblings height or parent's height
         if self.previous:
             self.y = self.previous.y + self.previous.height
         else:
@@ -93,20 +106,25 @@ class BlockLayout:
                 next = BlockLayout(child, self, previous)
                 self.children.append(next)
                 previous = next
-        else:
+        else: # Leaf node in layout tree
             self.cursor_x = 0
             self.cursor_y = 0
             self.weight = "normal"
             self.style = "roman"
             self.size = 12
             
+            '''
+            Since it's leaf node, then we can generate the x, y, word, font to be added to display_list
+            '''
             self.line = []
             self.recurse(self.node)
             self.flush()
 
+        # For each children recursively do the same
         for child in self.children:
             child.layout()
         
+        # Like the root layout, can calculate height after the child height is calculated
         if mode == "block":
             self.height = sum([child.height for child in self.children])
         else:
@@ -119,6 +137,7 @@ class BlockLayout:
             self.children.append(next)
             previous = next
 
+    # Determine whether a node is a block or inline
     def layout_mode(self):
         if isinstance(self.node, Text):
             return "inline"
@@ -178,6 +197,7 @@ class BlockLayout:
     '''
     1. Flush [array]line
     2. Append the line to [array]display_list
+    3. Determine max_ascent, max_descent, and baseline for every word position
     '''
     def flush(self):
         if not self.line: return
@@ -191,6 +211,7 @@ class BlockLayout:
             y = self.y + baseline - font.metrics("ascent")
             self.display_list.append((x, y, word, font))
 
+        # Reset cursor_x, move cursor_y at the end of flush
         self.cursor_x = 0
         self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
@@ -222,7 +243,10 @@ class BlockLayout:
             self.flush()
             self.cursor_y += self.vstep
 
-    # Recursively convert (calling handleWord and flush) to x, y, font, blabla
+    '''
+    Recursively convert (calling handleWord and flush) to x, y, font, blabla.
+    Btw the self.open_tag/close_tag work since class recursive is not creating a new instance
+    '''
     def recurse(self, node):
         if isinstance(node, Text):
             for word in node.text.split():
@@ -319,7 +343,7 @@ class Browser:
     def load(self, url: URL):
         res = url.request()
         self.nodes = HTMLParser(res["content"]).parse()
-        # self.tokens = lex(res)
+        
         #TODO: refactor havent handle view source
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
