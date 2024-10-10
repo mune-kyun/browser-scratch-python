@@ -61,14 +61,15 @@ class DocumentLayout:
     def paint(self):
         return []
 
+# In short, it wraps node to layout to be better
 class BlockLayout:
     def __init__(self, node, parent, previous):
         self.display_list = []
 
         self.hstep = HSTEP
         self.vstep = VSTEP
-        self.x = None
-        self.y = None
+        self.x = None   # Absolute in the screen, starting x
+        self.y = None   # Absolute in the screen, starting y
         self.width = None
         self.height = None
 
@@ -76,15 +77,16 @@ class BlockLayout:
         self.style = "roman"
         self.size = 12
 
-        self.node = node    # HTML tree
+        # HTML tree. After BlockLayout exist, now the children won't matter except for building the layout tree
+        self.node = node
         self.parent = parent
         self.previous = previous
         self.children = []  # Layout tree
     
     '''
     - Create layout tree
-    - Also creating HTML tree per leaf, so now each leaf contain sub tree of the whole HTML tree
-    - So, now per-BlockLayout has it's own smaller tree
+    - Now each html element has it's own layout (previously it's the tree is in a single layout)
+    - Per-BlockLayout has it's own smaller display_list tree
     '''
     def layout(self):
         # Set x starting point and width to parent
@@ -130,56 +132,18 @@ class BlockLayout:
         else:
             self.height = self.cursor_y
 
-    def layout_intermediate(self):
-        previous = None
-        for child in self.node.children:
-            next = BlockLayout(child, self, previous)
-            self.children.append(next)
-            previous = next
-
     # Determine whether a node is a block or inline
     def layout_mode(self):
         if isinstance(self.node, Text):
             return "inline"
         elif any([isinstance(child, Element) and \
-                  child.tag in BLOCK_ELEMENTS
-                  for child in self.node.children]):
+            child.tag in BLOCK_ELEMENTS
+            for child in self.node.children]):
             return "block"
         elif self.node.children:
             return "inline"
         else:
             return "block"
-
-    # This method is obsolete since we already use html tree
-    def handleToken(self, tok):
-        if isinstance(tok, Text):
-            #TODO: this doesnt handle \n
-            for word in tok.text.split():
-                self.handleWord(word)
-        
-        elif isinstance(tok, Tag):
-            tag = tok.tag
-            if tag == "i":
-                self.style = "italic"
-            elif tag == "/i":
-                self.style = "roman"
-            elif tag == "b":
-                self.weight = "bold"
-            elif tag == "/b":
-                self.weight = "normal"
-            elif tag == "small":
-                self.size -= 2
-            elif tag == "/small":
-                self.size += 2
-            elif tag == "big":
-                self.size += 4
-            elif tag == "/big":
-                self.size -= 4
-            elif tag == "br" or tag == "br/":
-                self.flush()
-            elif tag == "/p":
-                self.flush()
-                self.cursor_y += self.vstep
 
     # Determine coordinate of word
     def handleWord(self, word):
@@ -245,7 +209,8 @@ class BlockLayout:
 
     '''
     Recursively convert (calling handleWord and flush) to x, y, font, blabla.
-    Btw the self.open_tag/close_tag work since class recursive is not creating a new instance
+    Btw the self.open_tag/close_tag work since class recursive is not creating a new instance.
+    Note: this traverse HTML tree
     '''
     def recurse(self, node):
         if isinstance(node, Text):
@@ -258,9 +223,62 @@ class BlockLayout:
                 self.recurse(child)
             self.close_tag(node.tag)
 
+    '''
+    From existing display_list, convert to DrawText/DrawRect
+    '''
     def paint(self):
-        return self.display_list
+        cmds = []
+        
+        if isinstance(self.node, Element) and self.node.tag == "pre":
+            x2, y2 = self.x + self.width, self.y + self.height
+            cmds.append(DrawRect(self.x, self.y, x2, y2, "gray"))
+        
+        if self.layout_mode() == "inline":
+            for x, y, word, font in self.display_list:
+                cmds.append(DrawText(x, y, word, font))
 
+        return cmds
+
+class DrawText():
+    def __init__(self, x1, y1, text, font):
+        self.top = y1
+        self.left = x1
+        self.text = text
+        self.font = font
+        self.bottom = y1 + font.metrics("linespace")
+
+    def execute(self, scroll, canvas):
+        canvas.create_text(
+            self.left,
+            self.top - scroll,
+            text=self.text,
+            font=self.font,
+            anchor='nw'
+        )
+
+class DrawRect():
+    def __init__(self, x1, y1, x2, y2, color):
+        self.top = y1
+        self.left = x1
+        self.bottom = y2
+        self.right = x2
+        self.color = color
+    
+    def execute(self, scroll, canvas):
+        canvas.create_rectangle(
+            self.left,
+            self.top - scroll,
+            self.right,
+            self.bottom - scroll,
+            width=0,
+            fill=self.color
+        )
+
+'''
+Note: Traversing layout tree
+Convert display_list to DrawText/DrawRect
+Return the result to the passed display_list
+'''
 def paint_tree(layout_object, display_list):
     display_list.extend(layout_object.paint())
 
@@ -295,16 +313,12 @@ class Browser:
 
     def handle_configure(self, e):
         width, height = e.width, e.height
+
+        # Handle resize window
         if abs(self.width - width) > 1 or abs(self.height - height) > 1:
             self.width = width
             self.height = height
-            # self.display_list = Layout(
-            #     hstep=self.hstep,
-            #     vstep=self.vstep,
-            #     height=self.height,
-            #     width=self.width,
-            #     nodes=self.nodes
-            # ).display_list
+            # TODO: Handle reposition text
             self.canvas.delete("all")
             self.draw()
 
@@ -314,24 +328,17 @@ class Browser:
             return
         
         if direction == "<Down>":
-            char = display_list[len(display_list) - 1]
-            _, y, _, _ = char
+            # Max_y is self.document.height
+            # - by HEIGHT since that much content is already shown initially
+            # + 2*VSTEP whitespace top/bottom page
+            max_y = max(self.document.height + 2*VSTEP - HEIGHT, 0)
             
-            if self.y_below_screen(y):
-                self.scroll_val += SCROLL_STEP
-            else:
-                return
+            # Guard when scrolling beyond the whole content height
+            self.scroll_val = min(self.scroll_val + SCROLL_STEP, max_y)
             
         elif direction == "<Up>":
-            char = display_list[0]
-            _, y, _, _ = char
+            self.scroll_val = max(self.scroll_val - SCROLL_STEP, 0)
 
-            if self.y_above_screen(y):
-                self.scroll_val -= SCROLL_STEP
-            else:
-                return
-
-        self.canvas.delete("all")
         self.draw()
 
     def handle_mouse_wheel(self, e):
@@ -344,26 +351,24 @@ class Browser:
         res = url.request()
         self.nodes = HTMLParser(res["content"]).parse()
         
-        #TODO: refactor havent handle view source
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         paint_tree(self.document, self.display_list)
         self.draw()
 
-    def y_above_screen(self, y):
-        y_dest = y - self.scroll_val
-        return y_dest < 0
-    
-    def y_below_screen(self, y):
-        y_dest = y - self.scroll_val
-        return y_dest > self.height
-
     def draw(self):
-        display_list = self.display_list
-        for x, y, word, font in display_list:
-            if self.y_above_screen(y) or self.y_below_screen(y): continue
-            y_dest = y - self.scroll_val
-            self.canvas.create_text(x, y_dest, text=word, font=font, anchor="nw")
+        self.canvas.delete("all")
+        for cmd in self.display_list:
+            # Skip if above the screen (cuz if the bottom is above then is out of screen)
+            # Cuz scroll_val keeps increasing when scroll down
+            if cmd.bottom < self.scroll_val: continue
+            
+            # Skip if below the screen
+            # Equivalent with y - scroll_val > height
+            # On init, y/cmd.top that is below the screen is > 800
+            if cmd.top > self.scroll_val + HEIGHT: continue
+
+            cmd.execute(self.scroll_val, self.canvas)
 
 if __name__ == "__main__":
     import sys
