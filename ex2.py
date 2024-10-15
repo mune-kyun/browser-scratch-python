@@ -1,6 +1,7 @@
 import tkinter
 import tkinter.font
 from ex1 import URL, lex, Element, Text, HTMLParser
+from ex6 import style
 
 FONTS = {}
 
@@ -228,10 +229,13 @@ class BlockLayout:
     '''
     def paint(self):
         cmds = []
+        bgcolor = self.node.style.get("background-color",
+                                      "transparent")
         
-        if isinstance(self.node, Element) and self.node.tag == "pre":
+        if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
-            cmds.append(DrawRect(self.x, self.y, x2, y2, "gray"))
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
+            cmds.append(rect)
         
         if self.layout_mode() == "inline":
             for x, y, word, font in self.display_list:
@@ -350,6 +354,7 @@ class Browser:
     def load(self, url: URL):
         res = url.request()
         self.nodes = HTMLParser(res["content"]).parse()
+        style(self.nodes)
         
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
