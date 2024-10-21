@@ -1,7 +1,7 @@
 import tkinter
 import tkinter.font
 from ex1 import URL, lex, Element, Text, HTMLParser
-from ex6 import style
+from ex6 import style, CSSParser, tree_to_list, cascade_priority
 
 FONTS = {}
 
@@ -25,9 +25,11 @@ BLOCK_ELEMENTS = [
     "legend", "details", "summary"
 ]
 
-HEIGHT, WIDTH = 600, 800
+HEIGHT, WIDTH = 960, 1024
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
+
+DEFAULT_STYLE_SHEET = CSSParser(open("browser.css").read()).parse()
 
 class DocumentLayout:
     def __init__(self, node):
@@ -147,17 +149,19 @@ class BlockLayout:
             return "block"
 
     # Determine coordinate of word
-    def handleWord(self, word):
-        font = get_font(self.size, self.weight, self.style)
+    def handleWord(self, node, word):
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        if style == "normal": style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * .75)
+        font = get_font(size, weight, style)
+
         word_width = font.measure(word)
         if self.cursor_x + word_width > self.width:
             self.flush()
-        self.line.append((self.cursor_x, word, font))
-        
+        color = node.style["color"]
+        self.line.append((self.cursor_x, word, font, color))
         self.cursor_x += word_width + font.measure(" ")
-        #TODO: needs to be tested since parsing \n doesnt work
-        if "\n" in word:
-            pass
 
     '''
     1. Flush [array]line
@@ -166,22 +170,22 @@ class BlockLayout:
     '''
     def flush(self):
         if not self.line: return
-        metrics = [font.metrics() for x, word, font in self.line]
+        metrics = [font.metrics() for x, word, font, color in self.line]
         max_ascent = max([metric["ascent"] for metric in metrics])
         max_descent = max([metric["descent"] for metric in metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
 
-        for rel_x, word, font in self.line:
+        for rel_x, word, font, color in self.line:
             x = self.x + rel_x
             y = self.y + baseline - font.metrics("ascent")
-            self.display_list.append((x, y, word, font))
+            self.display_list.append((x, y, word, font, color))
 
         # Reset cursor_x, move cursor_y at the end of flush
         self.cursor_x = 0
         self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
 
-    # Change style
+    # Change style (obsolete)
     def open_tag(self, tag):
         if tag == "i":
             self.style = "italic"
@@ -194,7 +198,7 @@ class BlockLayout:
         elif tag == "br":
             self.flush()
     
-    # Revert style
+    # Revert style (obsolete)
     def close_tag(self, tag):
         if tag == "i":
             self.style = "roman"
@@ -216,13 +220,13 @@ class BlockLayout:
     def recurse(self, node):
         if isinstance(node, Text):
             for word in node.text.split():
-                self.handleWord(word)
+                self.handleWord(node, word)
 
         else:
-            self.open_tag(node.tag)
+            if node.tag == "br":
+                self.flush()
             for child in node.children:
                 self.recurse(child)
-            self.close_tag(node.tag)
 
     '''
     From existing display_list, convert to DrawText/DrawRect
@@ -231,24 +235,25 @@ class BlockLayout:
         cmds = []
         bgcolor = self.node.style.get("background-color",
                                       "transparent")
-        
+
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
             rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
             cmds.append(rect)
         
         if self.layout_mode() == "inline":
-            for x, y, word, font in self.display_list:
-                cmds.append(DrawText(x, y, word, font))
+            for x, y, word, font, color in self.display_list:
+                cmds.append(DrawText(x, y, word, font, color))
 
         return cmds
 
 class DrawText():
-    def __init__(self, x1, y1, text, font):
+    def __init__(self, x1, y1, text, font, color):
         self.top = y1
         self.left = x1
         self.text = text
         self.font = font
+        self.color = color
         self.bottom = y1 + font.metrics("linespace")
 
     def execute(self, scroll, canvas):
@@ -257,7 +262,8 @@ class DrawText():
             self.top - scroll,
             text=self.text,
             font=self.font,
-            anchor='nw'
+            anchor='nw',
+            fill=self.color
         )
 
 class DrawRect():
@@ -300,7 +306,8 @@ class Browser:
         self.canvas = tkinter.Canvas(
             self.window,
             width=self.width,
-            height=self.height
+            height=self.height,
+            bg="white",
         )
         self.canvas.pack(
             fill=tkinter.BOTH,
@@ -352,12 +359,32 @@ class Browser:
             self.scroll("<Up>")
 
     def load(self, url: URL):
+        # Getting html nodes
         res = url.request()
         self.nodes = HTMLParser(res["content"]).parse()
-        style(self.nodes)
         
+        # Styling
+        rules = DEFAULT_STYLE_SHEET.copy()
+        links = [node.attributes["href"]    # Get all the url of css files
+            for node in tree_to_list(self.nodes, [])
+            if isinstance(node, Element)
+            and node.tag == "link"
+            and node.attributes.get("rel") == "stylesheet"
+            and "href" in node.attributes]
+        for link in links:
+            style_url = url.resolve(link)
+            try:
+                style_res = style_url.request()
+                body = style_res["content"]
+                rules.extend(CSSParser(body).parse())
+            except:
+                continue
+        style(self.nodes, sorted(rules, key=cascade_priority))
+
+        # Layout
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
+        self.display_list = []
         paint_tree(self.document, self.display_list)
         self.draw()
 

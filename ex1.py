@@ -324,7 +324,24 @@ class URL:
             return self.request_data()
         elif self.scheme == URLScheme.TEST:
             return self.request_test()
-        
+
+    # Return instance of URL
+    # TODO: To really understand this part
+    def resolve(self, url):
+        if "://" in url: return URL(url)
+        if not url.startswith("/"):
+            dir, _ = self.path.rsplit("/", 1)
+            while url.startswith("../"):
+                _, url = url.split("/", 1)
+                if "/" in dir:
+                    dir, _ = dir.rsplit("/", 1)
+            url = dir + "/" + url
+        if url.startswith("//"):
+            return URL(self.scheme + ":" + url)
+        else:
+            return URL(self.scheme + "://" + self.host + \
+                       ":" + str(self.port) + url)
+
 # TODO: move completely to build tree
 # Get Text, Element from a body / Normal parsing
 def lex(resp, mode="lex"):

@@ -30,3 +30,7 @@ graph TD;
 ```
 
 </center>
+
+# Diagram Ch 5
+## Parsing style all
+## Order of processing the body request => get all styles => layouting
